@@ -1,0 +1,103 @@
+summary: Test the nfs-mount interface
+
+# ubuntu-core: nfs service not available on core
+# fedora, centos: disable until we can figure out how to handle NFS and SELinux
+#                 labels, labels can only be exported for NFSv4.2+ with the
+#                 security_label option
+systems: [-ubuntu-core-*, -fedora-*, -centos-*]
+
+environment:
+  SNAP: test-snapd-nfs-mount
+  SNAP_COMMON: /var/snap/${SNAP}/common
+  SRC: /srv/nfs
+  DST: ${SNAP_COMMON}/nfs
+  MESSAGE:  Hello, world!
+  RESPONSE: Message received!
+
+prepare: |
+  mkdir -p "${SRC}" "${DST}"
+  echo "${MESSAGE}" >> "${SRC}/message"
+
+  mkdir -p /etc/exports.d
+  echo '/srv/nfs 127.0.0.1(rw,sync,no_root_squash,no_subtree_check)' \
+    >| /etc/exports.d/test.export
+
+  # Make sure the nfs service is running
+  case "$SPREAD_SYSTEM" in
+    ubuntu-14.04-*)    service nfs-kernel-server start ;;
+    ubuntu-*|debian-*) systemctl restart nfs-kernel-server ;;
+    arch-*|fedora-*)
+      systemctl enable nfs-server
+      systemctl start  nfs-server
+      ;;
+    opensuse-*)
+      systemctl enable nfsserver
+      systemctl start  nfsserver
+      ;;
+    amazon-*|centos-*)
+      systemctl enable nfs
+      systemctl start  nfs
+      ;;
+    *)
+      echo "${SPREAD_SYSTEM} is not currently supported"
+      return 1
+      ;;
+  esac
+
+  exportfs -r
+
+restore: |
+  # Remove NFS exports
+  rm -f /etc/exports.d/test.export
+  rm -f -d /etc/exports.d
+  exportfs -r
+
+  rm -rf "${SRC}" "${DST}"
+
+  # Restart snapd to ensure it doesn't know about NFS configuration anymore.
+  systemctl stop snapd.service snapd.socket
+  systemctl reset-failed snapd.service snapd.socket
+  systemctl start snapd.service
+
+  # Depending on OS do cleanup appropriate for the host.
+  case "$SPREAD_SYSTEM" in
+    ubuntu-14.04-*)    service nfs-kernel-server stop ;;
+    amazon-*|centos-*) systemctl disable --now nfs    ;;
+    arch-*)
+      systemctl stop nfsdcld
+      systemctl disable --now nfs-server
+      ;;
+  esac
+
+execute: |
+  echo "Install the test snap"
+  "${TESTSTOOLS}/snaps-state" install-local "${SNAP}"
+
+  echo "Ensure that we can't mount without the interface connected"
+  ! "${SNAP}" mount.nfs4 -o rw,sync 127.0.0.1:"${SRC}" "${DST}" || return
+
+  echo "Connect the nfs-mount interface"
+  snap connect "${SNAP}":nfs-mount
+
+  echo "Attempt to mount the NFS share"
+  "${SNAP}" mount.nfs4 -o rw,sync 127.0.0.1:"${SRC}" "${DST}"
+
+  echo "Verify that mounted files are visible"
+  "${SNAP}" test -e "${DST}/message"
+
+  echo "and that they're readable"
+  "${SNAP}" grep -q "${MESSAGE}" "${DST}/message"
+
+  echo "Verify that we can write to the mounted directory"
+  echo "${RESPONSE}" >> "${DST}/response"
+
+  echo "Ensure that writes are propagated to the source of the mount"
+  test -e "${SRC}/response"
+
+  echo "and that the contents of the writes match"
+  MATCH "${RESPONSE}" <"${SRC}/response"
+
+  echo "Verify that we can unmount the NFS share"
+  umount.nfs "${DST}"
+
+  snap disconnect "${SNAP}":nfs-mount

@@ -1,0 +1,27 @@
+name: test-snapd-nfs-mount
+base: core22
+version: '1.0'
+summary: Snap for testing the nfs-mount interface
+description: Exactly what it says on the tin!
+
+grade: stable
+confinement: strict
+
+apps:
+  test-snapd-nfs-mount:
+    command: bin/sh
+    plugs: [ nfs-mount ]
+
+parts:
+  src:
+    plugin: dump
+    source: ./src
+    organize:
+      sh: bin/sh
+
+  pkgs:
+    plugin: nil
+    stage-packages: [ nfs-common ]
+    prime:
+      - sbin/mount.*
+      - sbin/umount.*
