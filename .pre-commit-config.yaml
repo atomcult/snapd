@@ -1,0 +1,21 @@
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.4.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+  - repo: https://github.com/golangci/golangci-lint
+    rev: v1.54.1
+    hooks:
+      - id: golangci-lint
+  - repo: git@github.com:atomcult/pre-commit-hooks.git
+    rev: 6b13fb71d970ec8384d276e1b736eecc666d119e
+  # - repo: local
+    hooks:
+      - id: copyright-check
+        # name: copyright-check
+        # description: Checks for a valid copyright header
+        # entry: check-copyright.sh
+        # language: script
+        types: [go]
