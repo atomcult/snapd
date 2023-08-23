@@ -1,7 +1,7 @@
 // -*- Mode: Go; indent-tabs-mode: t -*-
 
 /*
- * Copyright (C) 2019-2020 Canonical Ltd
+ * Copyright (C) 2019-2023 Canonical Ltd
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -25,6 +25,7 @@ import (
 	"github.com/jessevdk/go-flags"
 	. "gopkg.in/check.v1"
 
+	"github.com/snapcore/snapd/asserts/signtool"
 	"github.com/snapcore/snapd/cmd/snap-preseed"
 	"github.com/snapcore/snapd/dirs"
 	"github.com/snapcore/snapd/osutil/squashfs"
@@ -92,6 +93,12 @@ func (s *startPreseedSuite) TestRunPreseedClassicHappy(c *C) {
 	})
 	defer restore()
 
+	keyMgr := &fakeKeyMgr{defaultPrivKey, altPrivKey}
+	restoreGetKeypairMgr := main.MockGetKeypairManager(func() (signtool.KeypairManager, error) {
+		return keyMgr, nil
+	})
+	defer restoreGetKeypairMgr()
+
 	var called bool
 	restorePreseed := main.MockPreseedClassic(func(dir string) error {
 		c.Check(dir, Equals, "/a/dir")
@@ -111,6 +118,12 @@ func (s *startPreseedSuite) TestResetReexeced(c *C) {
 	})
 	defer restore()
 
+	keyMgr := &fakeKeyMgr{defaultPrivKey, altPrivKey}
+	restoreGetKeypairMgr := main.MockGetKeypairManager(func() (signtool.KeypairManager, error) {
+		return keyMgr, nil
+	})
+	defer restoreGetKeypairMgr()
+
 	var called bool
 	main.MockResetPreseededChroot(func(dir string) error {
 		c.Check(dir, Equals, "/")
@@ -128,6 +141,12 @@ func (s *startPreseedSuite) TestReset(c *C) {
 		return 0
 	})
 	defer restore()
+
+	keyMgr := &fakeKeyMgr{defaultPrivKey, altPrivKey}
+	restoreGetKeypairMgr := main.MockGetKeypairManager(func() (signtool.KeypairManager, error) {
+		return keyMgr, nil
+	})
+	defer restoreGetKeypairMgr()
 
 	var called bool
 	main.MockPreseedClassicReset(func(dir string) error {

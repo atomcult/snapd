@@ -3635,7 +3635,7 @@ func (s *imageSuite) TestPrepareWithUC20Preseed(c *C) {
 	restorePreseedCore20 := image.MockPreseedCore20(func(opts *preseed.CoreOptions) error {
 		preseedCalled = true
 		c.Assert(opts.PrepareImageDir, Equals, "/a/dir")
-		c.Assert(opts.PreseedSignKey, Equals, "foo")
+		c.Assert(opts.PreseedSignKey, Equals, brandPrivKey)
 		c.Assert(opts.AppArmorKernelFeaturesDir, Equals, "/custom/aa/features")
 		c.Assert(opts.SysfsOverlay, Equals, "/sysfs-overlay")
 		return nil
@@ -3650,7 +3650,7 @@ func (s *imageSuite) TestPrepareWithUC20Preseed(c *C) {
 		ModelFile:      fn,
 		Preseed:        true,
 		PrepareDir:     "/a/dir",
-		PreseedSignKey: "foo",
+		PreseedSignKey: brandPrivKey,
 		SysfsOverlay:   "/sysfs-overlay",
 
 		AppArmorKernelFeaturesDir: "/custom/aa/features",

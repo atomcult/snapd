@@ -1,7 +1,7 @@
 // -*- Mode: Go; indent-tabs-mode: t -*-
 
 /*
- * Copyright (C) 2019 Canonical Ltd
+ * Copyright (C) 2019-2023 Canonical Ltd
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -33,6 +33,10 @@ import (
 	"github.com/snapcore/snapd/interfaces/builtin"
 	"github.com/snapcore/snapd/osutil"
 	"github.com/snapcore/snapd/snap"
+
+	// for private key resolution
+	"github.com/snapcore/snapd/asserts/signtool"
+	"github.com/snapcore/snapd/i18n"
 )
 
 const (
@@ -49,7 +53,7 @@ first-boot startup time`
 type options struct {
 	Reset               bool   `long:"reset"`
 	ResetChroot         bool   `long:"reset-chroot" hidden:"1"`
-	PreseedSignKey      string `long:"preseed-sign-key"`
+	PreseedSignKeyName  string `long:"preseed-sign-key"`
 	AppArmorFeaturesDir string `long:"apparmor-features-dir"`
 	SysfsOverlay        string `long:"sysfs-overlay"`
 }
@@ -64,6 +68,8 @@ var (
 	preseedClassic              = preseed.Classic
 	preseedClassicReset         = preseed.ClassicReset
 	preseedResetPreseededChroot = preseed.ResetPreseededChroot
+
+	getKeypairManager = signtool.GetKeypairManager
 
 	opts options
 )
@@ -123,6 +129,22 @@ func run(parser *flags.Parser, args []string) (err error) {
 		}
 	}
 
+	// Retrieve the signing key
+	keypairMgr, err := getKeypairManager()
+	if err != nil {
+		return err
+	}
+
+	keyName := opts.PreseedSignKeyName
+	if keyName == "" {
+		keyName = `default`
+	}
+	privKey, err := keypairMgr.GetByName(keyName)
+	if err != nil {
+		// TRANSLATORS: %q is the key name, %v the error message
+		return fmt.Errorf(i18n.G("cannot use %q key: %v"), keyName, err)
+	}
+
 	if probeCore20ImageDir(chrootDir) {
 		if opts.Reset || opts.ResetChroot {
 			return fmt.Errorf("cannot snap-preseed --reset for Ubuntu Core")
@@ -130,7 +152,7 @@ func run(parser *flags.Parser, args []string) (err error) {
 
 		coreOpts := &preseed.CoreOptions{
 			PrepareImageDir:           chrootDir,
-			PreseedSignKey:            opts.PreseedSignKey,
+			PreseedSignKey:            privKey,
 			AppArmorKernelFeaturesDir: opts.AppArmorFeaturesDir,
 			SysfsOverlay:              opts.SysfsOverlay,
 		}
