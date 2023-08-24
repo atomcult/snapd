@@ -27,6 +27,7 @@ import (
 
 	"github.com/jessevdk/go-flags"
 
+	"github.com/snapcore/snapd/asserts"
 	"github.com/snapcore/snapd/asserts/signtool"
 	"github.com/snapcore/snapd/i18n"
 	"github.com/snapcore/snapd/image"
@@ -189,8 +190,20 @@ func (x *cmdPrepareImage) Execute(args []string) error {
 		return fmt.Errorf(i18n.G("cannot use %q key: %v"), keyName, err)
 	}
 
+	accountKey, err := mustGetOneAssert("account-key", map[string]string{"public-key-sha3-384": privKey.PublicKey().ID()})
+	if err != nil {
+		return err
+	}
+
+	account, err := mustGetOneAssert("account", map[string]string{"account-id": accountKey.(*asserts.AccountKey).AccountID()})
+	if err != nil {
+		return err
+	}
+
 	opts.Preseed = x.Preseed
 	opts.PreseedSignKey = privKey
+	opts.PreseedAccountAssert = *account.(*asserts.Account)
+	opts.PreseedAccountKeyAssert = *accountKey.(*asserts.AccountKey)
 	opts.AppArmorKernelFeaturesDir = x.AppArmorKernelFeaturesDir
 	opts.SysfsOverlay = x.SysfsOverlay
 

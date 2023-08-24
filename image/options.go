@@ -31,7 +31,9 @@ type Options struct {
 	// Preseed requests the image to be preseeded (only for UC20)
 	Preseed bool
 	// PreseedSignKey is the private key to use for signing preseed
-	PreseedSignKey asserts.PrivateKey
+	PreseedSignKey          asserts.PrivateKey
+	PreseedAccountAssert    asserts.Account
+	PreseedAccountKeyAssert asserts.AccountKey
 
 	// AppArmor kernel features directory to bind-mount when preseeding.
 	// If empty then the features from /sys/kernel/security/apparmor will be used.

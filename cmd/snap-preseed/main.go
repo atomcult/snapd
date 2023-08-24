@@ -129,25 +129,25 @@ func run(parser *flags.Parser, args []string) (err error) {
 		}
 	}
 
-	// Retrieve the signing key
-	keypairMgr, err := getKeypairManager()
-	if err != nil {
-		return err
-	}
-
-	keyName := opts.PreseedSignKeyName
-	if keyName == "" {
-		keyName = `default`
-	}
-	privKey, err := keypairMgr.GetByName(keyName)
-	if err != nil {
-		// TRANSLATORS: %q is the key name, %v the error message
-		return fmt.Errorf(i18n.G("cannot use %q key: %v"), keyName, err)
-	}
-
 	if probeCore20ImageDir(chrootDir) {
 		if opts.Reset || opts.ResetChroot {
 			return fmt.Errorf("cannot snap-preseed --reset for Ubuntu Core")
+		}
+
+		// Retrieve the signing key
+		keypairMgr, err := getKeypairManager()
+		if err != nil {
+			return err
+		}
+
+		keyName := opts.PreseedSignKeyName
+		if keyName == "" {
+			keyName = `default`
+		}
+		privKey, err := keypairMgr.GetByName(keyName)
+		if err != nil {
+			// TRANSLATORS: %q is the key name, %v the error message
+			return fmt.Errorf(i18n.G("cannot use %q key: %v"), keyName, err)
 		}
 
 		coreOpts := &preseed.CoreOptions{

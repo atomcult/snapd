@@ -174,6 +174,8 @@ func Prepare(opts *Options) error {
 		coreOpts := &preseed.CoreOptions{
 			PrepareImageDir:           opts.PrepareDir,
 			PreseedSignKey:            opts.PreseedSignKey,
+			PreseedAccountAssert:      opts.PreseedAccountAssert,
+			PreseedAccountKeyAssert:   opts.PreseedAccountKeyAssert,
 			AppArmorKernelFeaturesDir: opts.AppArmorKernelFeaturesDir,
 			SysfsOverlay:              opts.SysfsOverlay,
 		}

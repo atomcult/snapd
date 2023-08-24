@@ -54,6 +54,9 @@ type CoreOptions struct {
 	PrepareImageDir string
 	// key to sign preseeded data with
 	PreseedSignKey asserts.PrivateKey
+	// assertions for the signing key and its associated account
+	PreseedAccountAssert    asserts.Account
+	PreseedAccountKeyAssert asserts.AccountKey
 	// optional path to AppArmor kernel features directory
 	AppArmorKernelFeaturesDir string
 	// optional sysfs overlay
@@ -160,7 +163,7 @@ func writePreseedAssertion(artifactDigest []byte, opts *preseedCoreOptions) erro
 	}
 	headers := map[string]interface{}{
 		"type":              "preseed",
-		"authority-id":      model.AuthorityID(),
+		"authority-id":      opts.PreseedAccountAssert.AccountID(),
 		"series":            "16",
 		"brand-id":          model.BrandID(),
 		"model":             model.Model(),
@@ -198,7 +201,7 @@ func writePreseedAssertion(artifactDigest []byte, opts *preseedCoreOptions) erro
 
 	enc := asserts.NewEncoder(serialized)
 	for _, aref := range f.Refs() {
-		if aref.Type == asserts.PreseedType || aref.Type == asserts.AccountKeyType {
+		if aref.Type == asserts.PreseedType || aref.Type == asserts.AccountType || aref.Type == asserts.AccountKeyType {
 			as, err := aref.Resolve(adb.Find)
 			if err != nil {
 				return fmt.Errorf("internal error: %v", err)
