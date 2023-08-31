@@ -154,6 +154,26 @@ func Prepare(opts *Options) error {
 		return err
 	}
 
+	// If preseeding, make sure that preseeding key is delegated *before*
+	// setting up the seed
+	if opts.Preseed {
+		authorityDelegated := false
+		for _, authority := range model.PreseedAuthority() {
+			if opts.PreseedAccountAssert.AccountID() == authority {
+				authorityDelegated = true
+				break
+			}
+		}
+
+		if !authorityDelegated {
+			return fmt.Errorf(
+				"preseed key registered to %q, but expected one of %q",
+				opts.PreseedAccountAssert.AccountID(),
+				model.PreseedAuthority(),
+			)
+		}
+	}
+
 	if err := setupSeed(tsto, model, opts); err != nil {
 		return err
 	}
