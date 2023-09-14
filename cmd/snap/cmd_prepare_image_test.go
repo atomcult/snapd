@@ -22,8 +22,12 @@ package main_test
 import (
 	"fmt"
 	"io/ioutil"
+	"net/http"
+	"net/http/httptest"
+	"net/url"
 	"os"
 	"path/filepath"
+	"time"
 
 	. "gopkg.in/check.v1"
 
@@ -34,6 +38,7 @@ import (
 	"github.com/snapcore/snapd/image"
 	"github.com/snapcore/snapd/seed/seedwriter"
 	"github.com/snapcore/snapd/snap"
+	"github.com/snapcore/snapd/store"
 )
 
 type SnapPrepareImageSuite struct {
@@ -42,23 +47,28 @@ type SnapPrepareImageSuite struct {
 
 var _ = Suite(&SnapPrepareImageSuite{})
 
+const (
+	accountKeySignerHash = "Jv8_JiHiIzJVcO9M55pPdqSDWUvuhfDIBJUS-3VW7F_idjix7Ffn5qMxB21ZQuij"
+	accountSignerHash    = "-CvQKAwRQ5h3Ffn10FILJoEZUXOv6km9FwA80-Rcj-f-6jadQ89VRswHNiEB9Lxk"
+)
+
 var (
-	defaultPrivKey, _ = assertstest.GenerateKey(752)
-	altPrivKey, _     = assertstest.GenerateKey(752)
+	defaultBrandPrivKey, _ = assertstest.GenerateKey(752)
+	altBrandPrivKey, _     = assertstest.GenerateKey(752)
 )
 
 type fakeKeyMgr struct {
-	defaultKey asserts.PrivateKey
-	altKey     asserts.PrivateKey
+	defaultBrandKey asserts.PrivateKey
+	altBrandKey     asserts.PrivateKey
 }
 
 func (f *fakeKeyMgr) Put(privKey asserts.PrivateKey) error { return nil }
 func (f *fakeKeyMgr) Get(keyID string) (asserts.PrivateKey, error) {
 	switch keyID {
-	case f.defaultKey.PublicKey().ID():
-		return f.defaultKey, nil
-	case f.altKey.PublicKey().ID():
-		return f.altKey, nil
+	case f.defaultBrandKey.PublicKey().ID():
+		return f.defaultBrandKey, nil
+	case f.altBrandKey.PublicKey().ID():
+		return f.altBrandKey, nil
 	default:
 		return nil, fmt.Errorf("Could not find key pair with ID %q", keyID)
 	}
@@ -67,9 +77,9 @@ func (f *fakeKeyMgr) Get(keyID string) (asserts.PrivateKey, error) {
 func (f *fakeKeyMgr) GetByName(keyName string) (asserts.PrivateKey, error) {
 	switch keyName {
 	case "default":
-		return f.defaultKey, nil
+		return f.defaultBrandKey, nil
 	case "alt":
-		return f.altKey, nil
+		return f.altBrandKey, nil
 	default:
 		return nil, fmt.Errorf("Could not find key pair with name %q", keyName)
 	}
@@ -80,6 +90,33 @@ func (f *fakeKeyMgr) Export(keyName string) ([]byte, error)    { return nil, nil
 func (f *fakeKeyMgr) List() ([]asserts.ExternalKeyInfo, error) { return nil, nil }
 func (f *fakeKeyMgr) DeleteByName(keyName string) error        { return nil }
 
+func generateAccountKeyAssert(accountID string, key asserts.PrivateKey) string {
+	pubKeyBody, _ := asserts.EncodePublicKey(key.PublicKey())
+	return "type: account-key\n" +
+		"authority-id: canonical\n" +
+		"account-id: " + accountID + "\n" +
+		"name: default\n" +
+		"public-key-sha3-384: " + key.PublicKey().ID() + "\n" +
+		"since: " + time.Now().Format(time.RFC3339) + "\n" +
+		"body-length: " + fmt.Sprint(len(pubKeyBody)) + "\n" +
+		"sign-key-sha3-384: " + accountKeySignerHash + "\n\n" +
+		string(pubKeyBody) + "\n\n" +
+		"AXNpZw=="
+}
+
+func generateAccountAssert(accountID string) string {
+	return "type: account\n" +
+		"authority-id: canonical\n" +
+		"account-id: " + accountID + "\n" +
+		"display-name: " + accountID + "\n" +
+		"username: " + accountID + "\n" +
+		"validation: unproven\n" +
+		"timestamp: 2020-01-01T00:00:00Z\n" +
+		"body-length: 0\n" +
+		"sign-key-sha3-384: " + accountSignerHash + "\n\n" +
+		"AXNpZw=="
+}
+
 func (s *SnapPrepareImageSuite) TestPrepareImageCore(c *C) {
 	var opts *image.Options
 	prep := func(o *image.Options) error {
@@ -89,7 +126,7 @@ func (s *SnapPrepareImageSuite) TestPrepareImageCore(c *C) {
 	r := cmdsnap.MockImagePrepare(prep)
 	defer r()
 
-	keyMgr := &fakeKeyMgr{defaultPrivKey, altPrivKey}
+	keyMgr := &fakeKeyMgr{defaultBrandPrivKey, altBrandPrivKey}
 	restoreGetKeypairMgr := cmdsnap.MockGetKeypairManager(func() (signtool.KeypairManager, error) {
 		return keyMgr, nil
 	})
@@ -100,9 +137,8 @@ func (s *SnapPrepareImageSuite) TestPrepareImageCore(c *C) {
 	c.Assert(rest, DeepEquals, []string{})
 
 	c.Check(opts, DeepEquals, &image.Options{
-		ModelFile:      "model",
-		PrepareDir:     "prepare-dir",
-		PreseedSignKey: defaultPrivKey,
+		ModelFile:  "model",
+		PrepareDir: "prepare-dir",
 	})
 }
 
@@ -115,7 +151,7 @@ func (s *SnapPrepareImageSuite) TestPrepareImageClassic(c *C) {
 	r := cmdsnap.MockImagePrepare(prep)
 	defer r()
 
-	keyMgr := &fakeKeyMgr{defaultPrivKey, altPrivKey}
+	keyMgr := &fakeKeyMgr{defaultBrandPrivKey, altBrandPrivKey}
 	restoreGetKeypairMgr := cmdsnap.MockGetKeypairManager(func() (signtool.KeypairManager, error) {
 		return keyMgr, nil
 	})
@@ -126,10 +162,9 @@ func (s *SnapPrepareImageSuite) TestPrepareImageClassic(c *C) {
 	c.Assert(rest, DeepEquals, []string{})
 
 	c.Check(opts, DeepEquals, &image.Options{
-		Classic:        true,
-		ModelFile:      "model",
-		PrepareDir:     "prepare-dir",
-		PreseedSignKey: defaultPrivKey,
+		Classic:    true,
+		ModelFile:  "model",
+		PrepareDir: "prepare-dir",
 	})
 }
 
@@ -142,7 +177,7 @@ func (s *SnapPrepareImageSuite) TestPrepareImageClassicArch(c *C) {
 	r := cmdsnap.MockImagePrepare(prep)
 	defer r()
 
-	keyMgr := &fakeKeyMgr{defaultPrivKey, altPrivKey}
+	keyMgr := &fakeKeyMgr{defaultBrandPrivKey, altBrandPrivKey}
 	restoreGetKeypairMgr := cmdsnap.MockGetKeypairManager(func() (signtool.KeypairManager, error) {
 		return keyMgr, nil
 	})
@@ -153,11 +188,10 @@ func (s *SnapPrepareImageSuite) TestPrepareImageClassicArch(c *C) {
 	c.Assert(rest, DeepEquals, []string{})
 
 	c.Check(opts, DeepEquals, &image.Options{
-		Classic:        true,
-		Architecture:   "i386",
-		ModelFile:      "model",
-		PrepareDir:     "prepare-dir",
-		PreseedSignKey: defaultPrivKey,
+		Classic:      true,
+		Architecture: "i386",
+		ModelFile:    "model",
+		PrepareDir:   "prepare-dir",
 	})
 }
 
@@ -170,7 +204,7 @@ func (s *SnapPrepareImageSuite) TestPrepareImageClassicWideCohort(c *C) {
 	r := cmdsnap.MockImagePrepare(prep)
 	defer r()
 
-	keyMgr := &fakeKeyMgr{defaultPrivKey, altPrivKey}
+	keyMgr := &fakeKeyMgr{defaultBrandPrivKey, altBrandPrivKey}
 	restoreGetKeypairMgr := cmdsnap.MockGetKeypairManager(func() (signtool.KeypairManager, error) {
 		return keyMgr, nil
 	})
@@ -183,11 +217,10 @@ func (s *SnapPrepareImageSuite) TestPrepareImageClassicWideCohort(c *C) {
 	c.Assert(rest, DeepEquals, []string{})
 
 	c.Check(opts, DeepEquals, &image.Options{
-		Classic:        true,
-		WideCohortKey:  "is-six-centuries",
-		ModelFile:      "model",
-		PrepareDir:     "prepare-dir",
-		PreseedSignKey: defaultPrivKey,
+		Classic:       true,
+		WideCohortKey: "is-six-centuries",
+		ModelFile:     "model",
+		PrepareDir:    "prepare-dir",
 	})
 
 	os.Unsetenv("UBUNTU_STORE_COHORT_KEY")
@@ -202,7 +235,7 @@ func (s *SnapPrepareImageSuite) TestPrepareImageExtraSnaps(c *C) {
 	r := cmdsnap.MockImagePrepare(prep)
 	defer r()
 
-	keyMgr := &fakeKeyMgr{defaultPrivKey, altPrivKey}
+	keyMgr := &fakeKeyMgr{defaultBrandPrivKey, altBrandPrivKey}
 	restoreGetKeypairMgr := cmdsnap.MockGetKeypairManager(func() (signtool.KeypairManager, error) {
 		return keyMgr, nil
 	})
@@ -213,12 +246,11 @@ func (s *SnapPrepareImageSuite) TestPrepareImageExtraSnaps(c *C) {
 	c.Assert(rest, DeepEquals, []string{})
 
 	c.Check(opts, DeepEquals, &image.Options{
-		ModelFile:      "model",
-		Channel:        "candidate",
-		PrepareDir:     "prepare-dir",
-		Snaps:          []string{"foo", "bar", "local.snap", "local2.snap", "store-snap"},
-		SnapChannels:   map[string]string{"bar": "t/edge"},
-		PreseedSignKey: defaultPrivKey,
+		ModelFile:    "model",
+		Channel:      "candidate",
+		PrepareDir:   "prepare-dir",
+		Snaps:        []string{"foo", "bar", "local.snap", "local2.snap", "store-snap"},
+		SnapChannels: map[string]string{"bar": "t/edge"},
 	})
 }
 
@@ -231,7 +263,7 @@ func (s *SnapPrepareImageSuite) TestPrepareImageCustomize(c *C) {
 	r := cmdsnap.MockImagePrepare(prep)
 	defer r()
 
-	keyMgr := &fakeKeyMgr{defaultPrivKey, altPrivKey}
+	keyMgr := &fakeKeyMgr{defaultBrandPrivKey, altBrandPrivKey}
 	restoreGetKeypairMgr := cmdsnap.MockGetKeypairManager(func() (signtool.KeypairManager, error) {
 		return keyMgr, nil
 	})
@@ -250,9 +282,8 @@ func (s *SnapPrepareImageSuite) TestPrepareImageCustomize(c *C) {
 	c.Assert(rest, DeepEquals, []string{})
 
 	c.Check(opts, DeepEquals, &image.Options{
-		ModelFile:      "model",
-		PrepareDir:     "prepare-dir",
-		PreseedSignKey: defaultPrivKey,
+		ModelFile:  "model",
+		PrepareDir: "prepare-dir",
 		Customizations: image.Customizations{
 			ConsoleConf:       "disabled",
 			CloudInitUserData: "cloud-init-user-data",
@@ -277,7 +308,7 @@ func (s *SnapPrepareImageSuite) TestReadSeedManifest(c *C) {
 	})
 	defer r()
 
-	keyMgr := &fakeKeyMgr{defaultPrivKey, altPrivKey}
+	keyMgr := &fakeKeyMgr{defaultBrandPrivKey, altBrandPrivKey}
 	restoreGetKeypairMgr := cmdsnap.MockGetKeypairManager(func() (signtool.KeypairManager, error) {
 		return keyMgr, nil
 	})
@@ -289,10 +320,9 @@ func (s *SnapPrepareImageSuite) TestReadSeedManifest(c *C) {
 
 	c.Check(readManifestCalls, Equals, 1)
 	c.Check(opts, DeepEquals, &image.Options{
-		ModelFile:      "model",
-		PrepareDir:     "prepare-dir",
-		PreseedSignKey: defaultPrivKey,
-		SeedManifest:   seedwriter.MockManifest(map[string]*seedwriter.ManifestSnapRevision{"snapd": {SnapName: "snapd", Revision: snap.R(100)}}, nil, nil, nil),
+		ModelFile:    "model",
+		PrepareDir:   "prepare-dir",
+		SeedManifest: seedwriter.MockManifest(map[string]*seedwriter.ManifestSnapRevision{"snapd": {SnapName: "snapd", Revision: snap.R(100)}}, nil, nil, nil),
 	})
 }
 
@@ -310,21 +340,52 @@ func (s *SnapPrepareImageSuite) TestPrepareImagePreseed(c *C) {
 	r := cmdsnap.MockImagePrepare(prep)
 	defer r()
 
-	keyMgr := &fakeKeyMgr{defaultPrivKey, altPrivKey}
+	keyMgr := &fakeKeyMgr{defaultBrandPrivKey, altBrandPrivKey}
 	restoreGetKeypairMgr := cmdsnap.MockGetKeypairManager(func() (signtool.KeypairManager, error) {
 		return keyMgr, nil
 	})
 	defer restoreGetKeypairMgr()
 
+	var server *httptest.Server
+	restoreStoreNew := cmdsnap.MockStoreNew(func(cfg *store.Config, storeCtx store.DeviceAndAuthContext) *store.Store {
+		if cfg == nil {
+			cfg = store.DefaultConfig()
+		}
+		serverURL, _ := url.Parse(server.URL)
+		cfg.AssertionsBaseURL = serverURL
+		return store.New(cfg, storeCtx)
+	})
+	defer restoreStoreNew()
+
+	server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		c.Assert(r.Method, Equals, "GET")
+		switch r.URL.Path {
+		case "/v2/assertions/account-key/" + altBrandPrivKey.PublicKey().ID():
+			fmt.Fprint(w, generateAccountKeyAssert("brand", altBrandPrivKey))
+		case "/v2/assertions/account/brand":
+			fmt.Fprint(w, generateAccountAssert("brand"))
+		default:
+			c.Fatalf("invalid request: %q", r.URL.Path)
+		}
+	}))
+
 	rest, err := cmdsnap.Parser(cmdsnap.Client()).ParseArgs([]string{"prepare-image", "--preseed", "--preseed-sign-key", "alt", "--apparmor-features-dir", "aafeatures-dir", "--sysfs-overlay", "sys-overlay", "model", "prepare-dir"})
 	c.Assert(err, IsNil)
 	c.Assert(rest, DeepEquals, []string{})
+
+	c.Assert(opts.PreseedAccountAssert, NotNil)
+	c.Check(opts.PreseedAccountAssert.Header("account-id"), Equals, "brand")
+
+	c.Assert(opts.PreseedAccountKeyAssert, NotNil)
+	c.Check(opts.PreseedAccountKeyAssert.Header("public-key-sha3-384"), Equals, altBrandPrivKey.PublicKey().ID())
 
 	c.Check(opts, DeepEquals, &image.Options{
 		ModelFile:                 "model",
 		PrepareDir:                "prepare-dir",
 		Preseed:                   true,
-		PreseedSignKey:            altPrivKey,
+		PreseedSignKey:            &altBrandPrivKey,
+		PreseedAccountAssert:      opts.PreseedAccountAssert,
+		PreseedAccountKeyAssert:   opts.PreseedAccountKeyAssert,
 		SysfsOverlay:              "sys-overlay",
 		AppArmorKernelFeaturesDir: "aafeatures-dir",
 	})
@@ -339,7 +400,7 @@ func (s *SnapPrepareImageSuite) TestPrepareImageWriteRevisions(c *C) {
 	r := cmdsnap.MockImagePrepare(prep)
 	defer r()
 
-	keyMgr := &fakeKeyMgr{defaultPrivKey, altPrivKey}
+	keyMgr := &fakeKeyMgr{defaultBrandPrivKey, altBrandPrivKey}
 	restoreGetKeypairMgr := cmdsnap.MockGetKeypairManager(func() (signtool.KeypairManager, error) {
 		return keyMgr, nil
 	})
@@ -352,7 +413,6 @@ func (s *SnapPrepareImageSuite) TestPrepareImageWriteRevisions(c *C) {
 	c.Check(opts, DeepEquals, &image.Options{
 		ModelFile:        "model",
 		PrepareDir:       "prepare-dir",
-		PreseedSignKey:   defaultPrivKey,
 		SeedManifestPath: "./seed.manifest",
 	})
 
@@ -363,7 +423,6 @@ func (s *SnapPrepareImageSuite) TestPrepareImageWriteRevisions(c *C) {
 	c.Check(opts, DeepEquals, &image.Options{
 		ModelFile:        "model",
 		PrepareDir:       "prepare-dir",
-		PreseedSignKey:   defaultPrivKey,
 		SeedManifestPath: "/tmp/seed.manifest",
 	})
 }

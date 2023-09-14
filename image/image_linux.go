@@ -122,6 +122,14 @@ func Prepare(opts *Options) error {
 		}
 	}
 
+	// Check if the preseed key is allowed by the model
+	if !strutil.ListContains(model.PreseedAuthority(), opts.PreseedAccountAssert.AccountID()) {
+		return fmt.Errorf("%q not delegated for preseeding by the model, expected one of %q",
+			opts.PreseedAccountAssert.AccountID(),
+			model.PreseedAuthority(),
+		)
+	}
+
 	if model.Architecture() != "" && opts.Architecture != "" && model.Architecture() != opts.Architecture {
 		return fmt.Errorf("cannot override model architecture: %s", model.Architecture())
 	}

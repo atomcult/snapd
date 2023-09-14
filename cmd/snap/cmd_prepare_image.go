@@ -174,38 +174,41 @@ func (x *cmdPrepareImage) Execute(args []string) error {
 		return fmt.Errorf("--sysfs-overlay cannot be used without --preseed")
 	}
 
-	// Retrieve the signing key
-	keypairMgr, err := getKeypairManager()
-	if err != nil {
-		return err
-	}
-
-	keyName := x.PreseedSignKeyName
-	if keyName == "" {
-		keyName = `default`
-	}
-	privKey, err := keypairMgr.GetByName(keyName)
-	if err != nil {
-		// TRANSLATORS: %q is the key name, %v the error message
-		return fmt.Errorf(i18n.G("cannot use %q key: %v"), keyName, err)
-	}
-
-	accountKey, err := mustGetOneAssert("account-key", map[string]string{"public-key-sha3-384": privKey.PublicKey().ID()})
-	if err != nil {
-		return err
-	}
-
-	account, err := mustGetOneAssert("account", map[string]string{"account-id": accountKey.(*asserts.AccountKey).AccountID()})
-	if err != nil {
-		return err
-	}
-
 	opts.Preseed = x.Preseed
-	opts.PreseedSignKey = privKey
-	opts.PreseedAccountAssert = *account.(*asserts.Account)
-	opts.PreseedAccountKeyAssert = *accountKey.(*asserts.AccountKey)
 	opts.AppArmorKernelFeaturesDir = x.AppArmorKernelFeaturesDir
 	opts.SysfsOverlay = x.SysfsOverlay
+
+	if opts.Preseed {
+		// Retrieve the signing key
+		keypairMgr, err := getKeypairManager()
+		if err != nil {
+			return err
+		}
+
+		keyName := x.PreseedSignKeyName
+		if keyName == "" {
+			keyName = `default`
+		}
+		privKey, err := keypairMgr.GetByName(keyName)
+		if err != nil {
+			// TRANSLATORS: %q is the key name, %v the error message
+			return fmt.Errorf(i18n.G("cannot use %q key: %v"), keyName, err)
+		}
+
+		accountKey, err := mustGetOneAssert("account-key", map[string]string{"public-key-sha3-384": privKey.PublicKey().ID()})
+		if err != nil {
+			return err
+		}
+
+		account, err := mustGetOneAssert("account", map[string]string{"account-id": accountKey.(*asserts.AccountKey).AccountID()})
+		if err != nil {
+			return err
+		}
+
+		opts.PreseedSignKey = &privKey
+		opts.PreseedAccountAssert = account.(*asserts.Account)
+		opts.PreseedAccountKeyAssert = accountKey.(*asserts.AccountKey)
+	}
 
 	return imagePrepare(opts)
 }

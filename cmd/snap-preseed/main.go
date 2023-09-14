@@ -152,7 +152,7 @@ func run(parser *flags.Parser, args []string) (err error) {
 
 		coreOpts := &preseed.CoreOptions{
 			PrepareImageDir:           chrootDir,
-			PreseedSignKey:            privKey,
+			PreseedSignKey:            &privKey,
 			AppArmorKernelFeaturesDir: opts.AppArmorFeaturesDir,
 			SysfsOverlay:              opts.SysfsOverlay,
 		}

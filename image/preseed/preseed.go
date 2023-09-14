@@ -53,10 +53,10 @@ type CoreOptions struct {
 	// prepare image directory
 	PrepareImageDir string
 	// key to sign preseeded data with
-	PreseedSignKey asserts.PrivateKey
+	PreseedSignKey *asserts.PrivateKey
 	// assertions for the signing key and its associated account
-	PreseedAccountAssert    asserts.Account
-	PreseedAccountKeyAssert asserts.AccountKey
+	PreseedAccountAssert    *asserts.Account
+	PreseedAccountKeyAssert *asserts.AccountKey
 	// optional path to AppArmor kernel features directory
 	AppArmorKernelFeaturesDir string
 	// optional sysfs overlay
@@ -173,7 +173,7 @@ func writePreseedAssertion(artifactDigest []byte, opts *preseedCoreOptions) erro
 		"snaps":             snaps,
 	}
 
-	signedAssert, err := adb.Sign(asserts.PreseedType, headers, nil, opts.PreseedSignKey.PublicKey().ID())
+	signedAssert, err := adb.Sign(asserts.PreseedType, headers, nil, (*opts.PreseedSignKey).PublicKey().ID())
 	if err != nil {
 		return fmt.Errorf("cannot sign preseed assertion: %v", err)
 	}
