@@ -47,11 +47,6 @@ type SnapPrepareImageSuite struct {
 
 var _ = Suite(&SnapPrepareImageSuite{})
 
-const (
-	accountKeySignerHash = "Jv8_JiHiIzJVcO9M55pPdqSDWUvuhfDIBJUS-3VW7F_idjix7Ffn5qMxB21ZQuij"
-	accountSignerHash    = "-CvQKAwRQ5h3Ffn10FILJoEZUXOv6km9FwA80-Rcj-f-6jadQ89VRswHNiEB9Lxk"
-)
-
 var (
 	defaultBrandPrivKey, _ = assertstest.GenerateKey(752)
 	altBrandPrivKey, _     = assertstest.GenerateKey(752)
@@ -91,6 +86,7 @@ func (f *fakeKeyMgr) List() ([]asserts.ExternalKeyInfo, error) { return nil, nil
 func (f *fakeKeyMgr) DeleteByName(keyName string) error        { return nil }
 
 func generateAccountKeyAssert(accountID string, key asserts.PrivateKey) string {
+	const accountKeySignerHash = "Jv8_JiHiIzJVcO9M55pPdqSDWUvuhfDIBJUS-3VW7F_idjix7Ffn5qMxB21ZQuij"
 	pubKeyBody, _ := asserts.EncodePublicKey(key.PublicKey())
 	return "type: account-key\n" +
 		"authority-id: canonical\n" +
@@ -101,19 +97,6 @@ func generateAccountKeyAssert(accountID string, key asserts.PrivateKey) string {
 		"body-length: " + fmt.Sprint(len(pubKeyBody)) + "\n" +
 		"sign-key-sha3-384: " + accountKeySignerHash + "\n\n" +
 		string(pubKeyBody) + "\n\n" +
-		"AXNpZw=="
-}
-
-func generateAccountAssert(accountID string) string {
-	return "type: account\n" +
-		"authority-id: canonical\n" +
-		"account-id: " + accountID + "\n" +
-		"display-name: " + accountID + "\n" +
-		"username: " + accountID + "\n" +
-		"validation: unproven\n" +
-		"timestamp: 2020-01-01T00:00:00Z\n" +
-		"body-length: 0\n" +
-		"sign-key-sha3-384: " + accountSignerHash + "\n\n" +
 		"AXNpZw=="
 }
 
@@ -332,6 +315,20 @@ func (s *SnapPrepareImageSuite) TestPrepareImagePreseedArgError(c *C) {
 }
 
 func (s *SnapPrepareImageSuite) TestPrepareImagePreseed(c *C) {
+	const accountAssertString = `type: account
+authority-id: canonical
+account-id: my-brand
+display-name: my-brand
+username: my-brand
+validation: unproven
+timestamp: 2020-01-01T00:00:00Z
+body-length: 0
+sign-key-sha3-384: -CvQKAwRQ5h3Ffn10FILJoEZUXOv6km9FwA80-Rcj-f-6jadQ89VRswHNiEB9Lxk
+
+AXNpZw==`
+
+	var accountAssertKeyString = generateAccountKeyAssert("my-brand", altBrandPrivKey)
+
 	var opts *image.Options
 	prep := func(o *image.Options) error {
 		opts = o
@@ -361,9 +358,9 @@ func (s *SnapPrepareImageSuite) TestPrepareImagePreseed(c *C) {
 		c.Assert(r.Method, Equals, "GET")
 		switch r.URL.Path {
 		case "/v2/assertions/account-key/" + altBrandPrivKey.PublicKey().ID():
-			fmt.Fprint(w, generateAccountKeyAssert("brand", altBrandPrivKey))
-		case "/v2/assertions/account/brand":
-			fmt.Fprint(w, generateAccountAssert("brand"))
+			fmt.Fprint(w, accountAssertKeyString)
+		case "/v2/assertions/account/my-brand":
+			fmt.Fprint(w, accountAssertString)
 		default:
 			c.Fatalf("invalid request: %q", r.URL.Path)
 		}
@@ -373,19 +370,25 @@ func (s *SnapPrepareImageSuite) TestPrepareImagePreseed(c *C) {
 	c.Assert(err, IsNil)
 	c.Assert(rest, DeepEquals, []string{})
 
-	c.Assert(opts.PreseedAccountAssert, NotNil)
-	c.Check(opts.PreseedAccountAssert.Header("account-id"), Equals, "brand")
+	accountAssertDecode, err := asserts.Decode([]byte(accountAssertString))
+	c.Assert(err, IsNil)
 
-	c.Assert(opts.PreseedAccountKeyAssert, NotNil)
-	c.Check(opts.PreseedAccountKeyAssert.Header("public-key-sha3-384"), Equals, altBrandPrivKey.PublicKey().ID())
+	accountAssert, ok := accountAssertDecode.(*asserts.Account)
+	c.Assert(ok, Equals, true)
+
+	accountAssertKeyDecode, err := asserts.Decode([]byte(accountAssertKeyString))
+	c.Assert(err, IsNil)
+
+	accountKeyAssert, ok := accountAssertKeyDecode.(*asserts.AccountKey)
+	c.Assert(ok, Equals, true)
 
 	c.Check(opts, DeepEquals, &image.Options{
 		ModelFile:                 "model",
 		PrepareDir:                "prepare-dir",
 		Preseed:                   true,
 		PreseedSignKey:            &altBrandPrivKey,
-		PreseedAccountAssert:      opts.PreseedAccountAssert,
-		PreseedAccountKeyAssert:   opts.PreseedAccountKeyAssert,
+		PreseedAccountAssert:      accountAssert,
+		PreseedAccountKeyAssert:   accountKeyAssert,
 		SysfsOverlay:              "sys-overlay",
 		AppArmorKernelFeaturesDir: "aafeatures-dir",
 	})
