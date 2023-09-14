@@ -224,7 +224,7 @@ func (s *preseedSuite) testRunPreseedUC20Happy(c *C, customAppArmorFeaturesDir, 
 
 	opts := &preseed.CoreOptions{
 		PrepareImageDir:           tmpDir,
-		PreseedSignKey:            testKey,
+		PreseedSignKey:            &testKey,
 		AppArmorKernelFeaturesDir: customAppArmorFeaturesDir,
 		SysfsOverlay:              sysfsOverlay,
 	}

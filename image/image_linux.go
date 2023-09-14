@@ -122,14 +122,6 @@ func Prepare(opts *Options) error {
 		}
 	}
 
-	// Check if the preseed key is allowed by the model
-	if !strutil.ListContains(model.PreseedAuthority(), opts.PreseedAccountAssert.AccountID()) {
-		return fmt.Errorf("%q not delegated for preseeding by the model, expected one of %q",
-			opts.PreseedAccountAssert.AccountID(),
-			model.PreseedAuthority(),
-		)
-	}
-
 	if model.Architecture() != "" && opts.Architecture != "" && model.Architecture() != opts.Architecture {
 		return fmt.Errorf("cannot override model architecture: %s", model.Architecture())
 	}
@@ -165,6 +157,27 @@ func Prepare(opts *Options) error {
 	// If preseeding, make sure that preseeding key is delegated *before*
 	// setting up the seed
 	if opts.Preseed {
+		// TODO: support UC22
+		if model.Classic() {
+			return fmt.Errorf("cannot preseed the image for a classic model")
+		}
+
+		coreVersion, err := naming.CoreVersion(model.Base())
+		if err != nil {
+			return fmt.Errorf("cannot preseed the image for %s: %v", model.Base(), err)
+		}
+		if coreVersion < 20 {
+			return fmt.Errorf("cannot preseed the image for older base than core20")
+		}
+
+		// Check that the preseed key is allowed by the model
+		if !strutil.ListContains(model.PreseedAuthority(), opts.PreseedAccountAssert.AccountID()) {
+			return fmt.Errorf("%q not delegated for preseeding by the model, expected one of %q",
+				opts.PreseedAccountAssert.AccountID(),
+				model.PreseedAuthority(),
+			)
+		}
+
 		authorityDelegated := false
 		for _, authority := range model.PreseedAuthority() {
 			if opts.PreseedAccountAssert.AccountID() == authority {
@@ -187,18 +200,6 @@ func Prepare(opts *Options) error {
 	}
 
 	if opts.Preseed {
-		// TODO: support UC22
-		if model.Classic() {
-			return fmt.Errorf("cannot preseed the image for a classic model")
-		}
-
-		coreVersion, err := naming.CoreVersion(model.Base())
-		if err != nil {
-			return fmt.Errorf("cannot preseed the image for %s: %v", model.Base(), err)
-		}
-		if coreVersion < 20 {
-			return fmt.Errorf("cannot preseed the image for older base than core20")
-		}
 		coreOpts := &preseed.CoreOptions{
 			PrepareImageDir:           opts.PrepareDir,
 			PreseedSignKey:            opts.PreseedSignKey,
