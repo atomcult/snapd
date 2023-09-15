@@ -96,7 +96,7 @@ func (s *startPreseedSuite) TestRunPreseedUC20Happy(c *C) {
 	var called bool
 	restorePreseed := main.MockPreseedCore20(func(opts *preseed.CoreOptions) error {
 		c.Check(opts.PrepareImageDir, Equals, tmpDir)
-		c.Check(opts.PreseedSignKey, Equals, altPrivKey)
+		c.Check(opts.PreseedSignKey, DeepEquals, &altPrivKey)
 		c.Check(opts.AppArmorKernelFeaturesDir, Equals, "/custom/aa/features")
 		c.Check(opts.SysfsOverlay, Equals, "/sysfs-overlay")
 		called = true
@@ -131,7 +131,7 @@ func (s *startPreseedSuite) TestRunPreseedUC20HappyNoArgs(c *C) {
 	var called bool
 	restorePreseed := main.MockPreseedCore20(func(opts *preseed.CoreOptions) error {
 		c.Check(opts.PrepareImageDir, Equals, tmpDir)
-		c.Check(opts.PreseedSignKey, Equals, defaultPrivKey)
+		c.Check(opts.PreseedSignKey, DeepEquals, &defaultPrivKey)
 		c.Check(opts.AppArmorKernelFeaturesDir, Equals, "")
 		c.Check(opts.SysfsOverlay, Equals, "")
 		called = true
