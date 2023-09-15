@@ -172,23 +172,7 @@ func Prepare(opts *Options) error {
 
 		// Check that the preseed key is allowed by the model
 		if !strutil.ListContains(model.PreseedAuthority(), opts.PreseedAccountAssert.AccountID()) {
-			return fmt.Errorf("%q not delegated for preseeding by the model, expected one of %q",
-				opts.PreseedAccountAssert.AccountID(),
-				model.PreseedAuthority(),
-			)
-		}
-
-		authorityDelegated := false
-		for _, authority := range model.PreseedAuthority() {
-			if opts.PreseedAccountAssert.AccountID() == authority {
-				authorityDelegated = true
-				break
-			}
-		}
-
-		if !authorityDelegated {
-			return fmt.Errorf(
-				"preseed key registered to %q, but expected one of %q",
+			return fmt.Errorf("preseed key registered to account %q, but expected one of %q",
 				opts.PreseedAccountAssert.AccountID(),
 				model.PreseedAuthority(),
 			)
