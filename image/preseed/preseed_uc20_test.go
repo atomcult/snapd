@@ -222,9 +222,14 @@ func (s *preseedSuite) testRunPreseedUC20Happy(c *C, customAppArmorFeaturesDir, 
 	c.Assert(os.MkdirAll(filepath.Join(tmpDir, "system-seed/systems/20220203"), 0755), IsNil)
 	c.Assert(ioutil.WriteFile(filepath.Join(tmpDir, "system-seed/systems/20220203/preseed.tgz"), []byte(`hello world`), 0644), IsNil)
 
+	accountAssert := ts.Brands.Account("my-brand")
+	accountKeyAssert := ts.Brands.AccountKey("my-brand")
+
 	opts := &preseed.CoreOptions{
 		PrepareImageDir:           tmpDir,
 		PreseedSignKey:            &testKey,
+		PreseedAccountAssert:      accountAssert,
+		PreseedAccountKeyAssert:   accountKeyAssert,
 		AppArmorKernelFeaturesDir: customAppArmorFeaturesDir,
 		SysfsOverlay:              sysfsOverlay,
 	}
