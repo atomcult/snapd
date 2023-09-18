@@ -342,6 +342,9 @@ func (s *preseedSuite) testRunPreseedUC20Happy(c *C, customAppArmorFeaturesDir, 
 		case asserts.AccountKeyType:
 			acckeyAs := as.(*asserts.AccountKey)
 			tpe = fmt.Sprintf("%s:%s", as.Type().Name, acckeyAs.AccountID())
+		case asserts.AccountType:
+			accAs := as.(*asserts.Account)
+			tpe = fmt.Sprintf("%s:%s", as.Type().Name, accAs.AccountID())
 		case asserts.PreseedType:
 			preseedAs := as.(*asserts.Preseed)
 			c.Check(preseedAs.Revision(), Equals, 0)
@@ -366,6 +369,7 @@ func (s *preseedSuite) testRunPreseedUC20Happy(c *C, customAppArmorFeaturesDir, 
 
 	c.Check(seen, DeepEquals, map[string]bool{
 		"account-key:my-brand": true,
+		"account:my-brand":     true,
 		"preseed":              true,
 	})
 }
