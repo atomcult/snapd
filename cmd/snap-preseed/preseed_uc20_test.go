@@ -153,12 +153,6 @@ func (s *startPreseedSuite) TestResetUC20(c *C) {
 	})
 	defer restore()
 
-	keyMgr := &fakeKeyMgr{defaultPrivKey, altPrivKey}
-	restoreGetKeypairMgr := main.MockGetKeypairManager(func() (signtool.KeypairManager, error) {
-		return keyMgr, nil
-	})
-	defer restoreGetKeypairMgr()
-
 	// for UC20 probing
 	c.Assert(os.MkdirAll(filepath.Join(tmpDir, "system-seed/systems/20220203"), 0755), IsNil)
 	// we don't run tar, so create a fake artifact to make FileDigest happy
