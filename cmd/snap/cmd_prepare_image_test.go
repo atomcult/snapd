@@ -109,12 +109,6 @@ func (s *SnapPrepareImageSuite) TestPrepareImageCore(c *C) {
 	r := cmdsnap.MockImagePrepare(prep)
 	defer r()
 
-	keyMgr := &fakeKeyMgr{defaultBrandPrivKey, altBrandPrivKey}
-	restoreGetKeypairMgr := cmdsnap.MockGetKeypairManager(func() (signtool.KeypairManager, error) {
-		return keyMgr, nil
-	})
-	defer restoreGetKeypairMgr()
-
 	rest, err := cmdsnap.Parser(cmdsnap.Client()).ParseArgs([]string{"prepare-image", "model", "prepare-dir"})
 	c.Assert(err, IsNil)
 	c.Assert(rest, DeepEquals, []string{})
@@ -133,12 +127,6 @@ func (s *SnapPrepareImageSuite) TestPrepareImageClassic(c *C) {
 	}
 	r := cmdsnap.MockImagePrepare(prep)
 	defer r()
-
-	keyMgr := &fakeKeyMgr{defaultBrandPrivKey, altBrandPrivKey}
-	restoreGetKeypairMgr := cmdsnap.MockGetKeypairManager(func() (signtool.KeypairManager, error) {
-		return keyMgr, nil
-	})
-	defer restoreGetKeypairMgr()
 
 	rest, err := cmdsnap.Parser(cmdsnap.Client()).ParseArgs([]string{"prepare-image", "--classic", "model", "prepare-dir"})
 	c.Assert(err, IsNil)
@@ -160,12 +148,6 @@ func (s *SnapPrepareImageSuite) TestPrepareImageClassicArch(c *C) {
 	r := cmdsnap.MockImagePrepare(prep)
 	defer r()
 
-	keyMgr := &fakeKeyMgr{defaultBrandPrivKey, altBrandPrivKey}
-	restoreGetKeypairMgr := cmdsnap.MockGetKeypairManager(func() (signtool.KeypairManager, error) {
-		return keyMgr, nil
-	})
-	defer restoreGetKeypairMgr()
-
 	rest, err := cmdsnap.Parser(cmdsnap.Client()).ParseArgs([]string{"prepare-image", "--classic", "--arch", "i386", "model", "prepare-dir"})
 	c.Assert(err, IsNil)
 	c.Assert(rest, DeepEquals, []string{})
@@ -186,12 +168,6 @@ func (s *SnapPrepareImageSuite) TestPrepareImageClassicWideCohort(c *C) {
 	}
 	r := cmdsnap.MockImagePrepare(prep)
 	defer r()
-
-	keyMgr := &fakeKeyMgr{defaultBrandPrivKey, altBrandPrivKey}
-	restoreGetKeypairMgr := cmdsnap.MockGetKeypairManager(func() (signtool.KeypairManager, error) {
-		return keyMgr, nil
-	})
-	defer restoreGetKeypairMgr()
 
 	os.Setenv("UBUNTU_STORE_COHORT_KEY", "is-six-centuries")
 
@@ -218,12 +194,6 @@ func (s *SnapPrepareImageSuite) TestPrepareImageExtraSnaps(c *C) {
 	r := cmdsnap.MockImagePrepare(prep)
 	defer r()
 
-	keyMgr := &fakeKeyMgr{defaultBrandPrivKey, altBrandPrivKey}
-	restoreGetKeypairMgr := cmdsnap.MockGetKeypairManager(func() (signtool.KeypairManager, error) {
-		return keyMgr, nil
-	})
-	defer restoreGetKeypairMgr()
-
 	rest, err := cmdsnap.Parser(cmdsnap.Client()).ParseArgs([]string{"prepare-image", "model", "prepare-dir", "--channel", "candidate", "--snap", "foo", "--snap", "bar=t/edge", "--snap", "local.snap", "--extra-snaps", "local2.snap", "--extra-snaps", "store-snap"})
 	c.Assert(err, IsNil)
 	c.Assert(rest, DeepEquals, []string{})
@@ -245,12 +215,6 @@ func (s *SnapPrepareImageSuite) TestPrepareImageCustomize(c *C) {
 	}
 	r := cmdsnap.MockImagePrepare(prep)
 	defer r()
-
-	keyMgr := &fakeKeyMgr{defaultBrandPrivKey, altBrandPrivKey}
-	restoreGetKeypairMgr := cmdsnap.MockGetKeypairManager(func() (signtool.KeypairManager, error) {
-		return keyMgr, nil
-	})
-	defer restoreGetKeypairMgr()
 
 	tmpdir := c.MkDir()
 	customizeFile := filepath.Join(tmpdir, "custo.json")
@@ -290,12 +254,6 @@ func (s *SnapPrepareImageSuite) TestReadSeedManifest(c *C) {
 		return seedwriter.MockManifest(map[string]*seedwriter.ManifestSnapRevision{"snapd": {SnapName: "snapd", Revision: snap.R(100)}}, nil, nil, nil), nil
 	})
 	defer r()
-
-	keyMgr := &fakeKeyMgr{defaultBrandPrivKey, altBrandPrivKey}
-	restoreGetKeypairMgr := cmdsnap.MockGetKeypairManager(func() (signtool.KeypairManager, error) {
-		return keyMgr, nil
-	})
-	defer restoreGetKeypairMgr()
 
 	rest, err := cmdsnap.Parser(cmdsnap.Client()).ParseArgs([]string{"prepare-image", "model", "prepare-dir", "--revisions", "seed.manifest"})
 	c.Assert(err, IsNil)
@@ -402,12 +360,6 @@ func (s *SnapPrepareImageSuite) TestPrepareImageWriteRevisions(c *C) {
 	}
 	r := cmdsnap.MockImagePrepare(prep)
 	defer r()
-
-	keyMgr := &fakeKeyMgr{defaultBrandPrivKey, altBrandPrivKey}
-	restoreGetKeypairMgr := cmdsnap.MockGetKeypairManager(func() (signtool.KeypairManager, error) {
-		return keyMgr, nil
-	})
-	defer restoreGetKeypairMgr()
 
 	rest, err := cmdsnap.Parser(cmdsnap.Client()).ParseArgs([]string{"prepare-image", "model", "prepare-dir", "--write-revisions"})
 	c.Assert(err, IsNil)
