@@ -100,6 +100,10 @@ func MockTrusted(mockTrusted []asserts.Assertion) (restore func()) {
 }
 
 func writePreseedAssertion(artifactDigest []byte, opts *preseedCoreOptions) error {
+	if opts.PreseedAccountAssert == nil {
+		return fmt.Errorf("no preseed account assertion supplied")
+	}
+
 	keypairMgr, err := getKeypairManager()
 	if err != nil {
 		return err
